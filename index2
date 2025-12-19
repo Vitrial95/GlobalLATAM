@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LATAM Globe Ingenios</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: none;
+      }
+      #globeViz {
+        width: auto;
+        height: auto;
+        overflow: hidden;
+        font-family: "Orbitron", sans-serif;
+      }
+
+      @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap");
+
+      .label-sci {
+        background: rgba(0, 30, 40, 0.65);
+        border: 1px solid rgba(0, 255, 150, 0.9);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 12px;
+        color: #fff;
+        text-shadow: 0 0 4px rgba(0, 255, 180, 0.75);
+        box-shadow: 0 0 8px rgba(0, 255, 180, 0.45),
+          inset 0 0 4px rgba(0, 255, 180, 0.25);
+        backdrop-filter: blur(5px);
+        white-space: nowrap;
+        pointer-events: auto;
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+      }
+
+      .tooltip {
+        display: none;
+        position: absolute;
+        top: 26px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 20, 30, 0.95);
+        border: 1px solid rgba(0, 255, 150, 0.8);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 11px;
+        max-width: 220px;
+        white-space: normal;
+        box-shadow: 0 0 8px rgba(0, 255, 150, 0.4);
+        z-index: 10;
+      }
+
+      .label-sci:hover .tooltip {
+        display: block;
+      }
+
+      /* TOOLTIP GLOBAL DE PAISES */
+      #countryTooltip {
+        position: fixed;
+        pointer-events: none;
+        display: none;
+        background: rgba(0, 20, 30, 0.95);
+        border: 1px solid rgba(0, 255, 150, 0.8);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 12px;
+        color: white;
+        max-width: 260px;
+        z-index: 999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="globeViz"></div>
+    <div id="countryTooltip"></div>
+
+    <script src="https://unpkg.com/three"></script>
+    <script src="https://unpkg.com/globe.gl"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+
+    <script>
+      const latam = [
+        "Argentina",
+        "Bolivia",
+        "Chile",
+        "Colombia",
+        "Costa Rica",
+        "Cuba",
+        "Ecuador",
+        "Brazil",
+        "El Salvador",
+        "Guatemala",
+        "Haiti",
+        "Honduras",
+        "Mexico",
+        "Nicaragua",
+        "Panama",
+        "Paraguay",
+        "Peru",
+        "Republica Dominicana",
+        "Uruguay",
+        "Venezuela",
+      ];
+
+      /* =========================
+         BASE DE COMMODITIES
+      ========================= */
+      const countryCommodities = {
+        Argentina: {
+          Soja: ["Harina", "Aceite", "Poroto"],
+          Maíz: ["Maíz amarillo"],
+          Azúcar: ["Azúcar crudo"],
+        },
+        Brazil: {
+          Soja: ["Grano", "Harina", "Aceite"],
+          Maíz: ["Maíz"],
+          Azúcar: ["Azúcar", "Etanol"],
+        },
+        Paraguay: {
+          Soja: ["Grano"],
+          Maíz: ["Maíz"],
+        },
+        Guatemala: {
+          Azúcar: ["Azúcar crudo", "Azúcar refinado"],
+        },
+        Colombia: {
+          Azúcar: ["Azúcar", "Etanol"],
+        },
+      };
+
+      // Base de datos de ingenios
+      const labels = [
+        {
+          name: "Guatemala",
+          lat: 14.6,
+          lng: -90.5,
+          info: `Ingenio Concepción<br>Ingenio Santa Teresa<br>Ingenio La Unión<br>Ingenio Madre Tierra<br>Ingenio Tululá`,
+        },
+        {
+          name: "Chile",
+          lat: -33.45,
+          lng: -70.66,
+        },
+        {
+          name: "Uruguay",
+          lat: -32.52,
+          lng: -55.77,
+        },
+        {
+          name: "Brasil",
+          lat: -15.78,
+          lng: -47.93,
+        },
+        {
+          name: "Colombia",
+          lat: 4.7,
+          lng: -74.1,
+          info: `Manuelita (Grupo Manuelita)<br>Ingenio San Carlos Colombia<br>Ingenio Pichichí<br>Ingenio María Luisa<br>Ingenio del Cauca<br>Ingenio La Cabaña Colombia`,
+        },
+        {
+          name: "Bolivia",
+          lat: -16.5,
+          lng: -68.1,
+          info: `San Aurelio (CIASA)<br>Ingenio Don Guillermo`,
+        },
+        {
+          name: "Costa Rica",
+          lat: 9.9,
+          lng: -84.1,
+          info: `Azucarera El Palmar<br>Azucarera El Viejo<br>CATSA<br>Coopeagri R.L.<br>Coopevictoria R.L.<br>El Porvenir<br>Hacienda Juan Viñas<br>Atirro`,
+        },
+        {
+          name: "Republica Dominicana",
+          lat: 18.5,
+          lng: -69.9,
+          info: `Ingenio La Romana<br>Ingenio Cristóbal Colón<br>INAZUCAR`,
+        },
+        {
+          name: "El Salvador",
+          lat: 13.7,
+          lng: -89.2,
+          info: `Chaparrastique<br>Ingenio La Magdalena - El Salvador<br>Asociación Azucarera de El Salvador / CONSAA`,
+        },
+        {
+          name: "Honduras",
+          lat: 14.1,
+          lng: -87.2,
+          info: `Azucarera Tres Valles Honduras<br>Azucarera del Norte (Azunosa)<br>Compañía Azucarera Chumbagua<br>Azucarera Yojoa (AYSA)`,
+        },
+        {
+          name: "Venezuela",
+          lat: 10.5,
+          lng: -66.9,
+          info: `Central Portuguesa (CAPCA)<br>Central Las Majaguas<br>Central Batalla de Araure<br>Central La Pastora<br>Central El Palmar<br>Central Sucre<br>Central Río Turbio`,
+        },
+        {
+          name: "Peru",
+          lat: -12.0,
+          lng: -77.0,
+          info: `Ingenio Tumán`,
+        },
+        {
+          name: "Argentina",
+          lat: -34.6,
+          lng: -58.4,
+          info: `Ingenio Concepción<br>Ingenio Bella Vista<br>Ingenio La Florida<br>Ingenio La Fronterita<br>Ingenio La Providencia<br>Ingenio La Trinidad<br>Ingenio Leales<br>Ingenio Marapa<br>Ingenio Ñuñorco<br>Ingenio San Juan<br>Ingenio Santa Bárbara<br>Ingenio La Esperanza<br>Ingenio Río Grande`,
+        },
+        {
+          name: "Paraguay",
+          lat: -25.3,
+          lng: -57.6,
+          info: `OTISA<br>INPASA<br>Alcotec S.A.<br>Hibernia Misiones S.A.`,
+        },
+        {
+          name: "Mexico",
+          lat: 19.4,
+          lng: -99.1,
+          info: `Ingenio Tres Valles, S. A.<br>INGENIO LA GLORIA<br>Ingenio El Modelo S.A DE C.V.<br>Ingenio San Cristóbal<br>INGENIO CALIPAM S.A. DE C.V<br>Ingenio Pedernales<br>Industria Azucarera Ingenio San Nicolás<br>Ingenio San Miguelito`,
+        },
+        {
+          name: "Panama",
+          lat: 8.9,
+          lng: -79.5,
+          info: `Compañía Azucarera La Estrella<br>Ingenio Santa Rosa<br>Central Azucarera de Alanje<br>Central Azucarera La Victoria`,
+        },
+        {
+          name: "Nicaragua",
+          lat: 12.1,
+          lng: -86.2,
+          info: `Ingenio San Antonio Nicaragua<br>Ingenio Monte Rosa<br>Ingenio Benjamín Zeledón`,
+        },
+        {
+          name: "Ecuador",
+          lat: -0.2,
+          lng: -78.5,
+          info: `IANCEM<br>Agroazúcar / La Troncal<br>Energías del Agro San Juan S.A.<br>Sonino S.A.`,
+        },
+      ];
+
+      const globe = Globe()(document.getElementById("globeViz"))
+        .globeImageUrl(
+          "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+        )
+        .labelsData(labels)
+        .labelText(() => "")
+        .labelLat((d) => d.lat)
+        .labelLng((d) => d.lng)
+        .labelDotRadius(0)
+        .htmlElementsData(labels)
+        .htmlElement((d) => {
+          const el = document.createElement("div");
+          el.className = "label-sci";
+          el.innerHTML = `
+            ${d.name}
+            <div class="tooltip">${d.info || ""}</div>
+          `;
+          return el;
+        });
+
+      const tooltip = document.getElementById("countryTooltip");
+
+      globe.onPolygonHover((polygon) => {
+        if (!polygon) {
+          tooltip.style.display = "none";
+          return;
+        }
+
+        const country = polygon.properties.name;
+        const data = countryCommodities[country];
+
+        if (!data) {
+          tooltip.style.display = "none";
+          return;
+        }
+
+        let html = `<strong>${country}</strong>`;
+        Object.entries(data).forEach(([c, list]) => {
+          html += `<div style="margin-top:6px">
+            <b>${c}</b>
+            <ul style="margin:4px 0;padding-left:14px">
+              ${list.map((i) => `<li>${i}</li>`).join("")}
+            </ul>
+          </div>`;
+        });
+
+        tooltip.innerHTML = html;
+        tooltip.style.display = "block";
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        tooltip.style.left = e.clientX + 15 + "px";
+        tooltip.style.top = e.clientY + 15 + "px";
+      });
+
+      fetch("https://unpkg.com/world-atlas@2/countries-50m.json")
+        .then((res) => res.json())
+        .then((data) => {
+          const geo = topojson.feature(
+            data,
+            data.objects.countries
+          ).features;
+          globe
+            .polygonsData(geo.filter((f) => latam.includes(f.properties.name)))
+            .polygonCapColor(() => "rgba(0,0,0,0)")
+            .polygonSideColor(() => "rgba(0,0,0,0)")
+            .polygonStrokeColor(() => "rgb(0,155,90)")
+            .polygonStrokeWidth(0.5)
+            .polygonAltitude(0.02);
+        });
+
+      globe.controls().autoRotate = false;
+    </script>
+  </body>
+</html>
